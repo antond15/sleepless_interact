@@ -26,9 +26,10 @@ end
 ---@return number y The y-coordinate.
 ---@return number z The z-coordinate.
 ---@return string offsetType The type of offset.
+---@return string? boneName The name of the bone (if any).
 function utils.getCoordsAndTypeFromOffsetId(id)
-    local x, y, z, offsetType = id:match("(%-?%d+)_(%-?%d+)_(%-?%d+)_(%w+)")
-    return x / 1000, y / 1000, z / 1000, offsetType
+    local x, y, z, offsetType, boneName = id:match("(%-?%d+)_(%-?%d+)_(%-?%d+)_(%w+)_?(.*)")
+    return x / 1000, y / 1000, z / 1000, offsetType, boneName
 end
 
 ---@param coords table|vector3|vector4 The input coordinates.
@@ -75,6 +76,51 @@ function utils.getResponse(option, server)
     return response
 end
 
+---@param rotation vector3 Use rotation order 2
+---@return [vector3, vector3, vector3] matrix
+local function getRotationMatrix(rotation)
+    local xRot = math.rad(rotation.x)
+    local yRot = math.rad(rotation.y)
+    local zRot = math.rad(rotation.z)
+
+    local xCos, xSin = math.cos(xRot), math.sin(xRot)
+    local yCos, ySin = math.cos(yRot), math.sin(yRot)
+    local zCos, zSin = math.cos(zRot), math.sin(zRot)
+
+    return {
+        vec3(
+            zCos * yCos - zSin * xSin * ySin,
+            yCos * zSin + zCos * xSin * ySin,
+            -xCos * ySin
+        ),
+        vec3(
+            -xCos * zSin,
+            zCos * xCos,
+            xSin
+        ),
+        vec3(
+            zCos * ySin + yCos * zSin * xSin,
+            zSin * ySin - zCos * yCos * xSin,
+            xCos * yCos
+        )
+    }
+end
+
+--- Similar as `GetOffsetFromEntityInWorldCoords` but it takes specific coords and rotation, not requiring to be tied to entity
+---@param coords vector3 Coords from which to calculate the offset
+---@param rotation vector3 Rotation to use in the calculation
+---@param offset vector3 Offset to apply
+---@return vector3 coords The offseted coordinates in world coords
+function utils.getRelativeOffsetFromCoordsInWorldCoords(coords, rotation, offset)
+    local matrix = getRotationMatrix(rotation)
+
+    return vec3(
+        offset.x * matrix[1].x + offset.y * matrix[2].x + offset.z * matrix[3].x + coords.x,
+        offset.x * matrix[1].y + offset.y * matrix[2].y + offset.z * matrix[3].y + coords.y,
+        offset.x * matrix[1].z + offset.y * matrix[2].z + offset.z * matrix[3].z + coords.z
+    )
+end
+
 local GetOffsetFromEntityInWorldCoords = GetOffsetFromEntityInWorldCoords
 local GetEntityBoneIndexByName = GetEntityBoneIndexByName
 local GetModelDimensions = GetModelDimensions
@@ -91,18 +137,27 @@ function utils.getDrawCoordsForInteract(item)
     end
 
     if item.offset then
-        local x, y, z, offsetType = utils.getCoordsAndTypeFromOffsetId(item.offset)
+        local x, y, z, offsetType, boneName = utils.getCoordsAndTypeFromOffsetId(item.offset)
         local entityModel = GetEntityModel(item.entity)
 
         ---@diagnostic disable-next-line: param-type-mismatch
         local offset = vec3(tonumber(x), tonumber(y), tonumber(z))
+        local worldPos
 
-        if offsetType == "offset" then
+        if offsetType == 'offset' then
             local min, max = GetModelDimensions(entityModel)
             offset = (max - min) * offset + min
+            worldPos = GetOffsetFromEntityInWorldCoords(item.entity, offset.x, offset.y, offset.z)
+
+        elseif boneName and offsetType == 'offsetBones' then
+            local boneIndex = GetEntityBoneIndexByName(item.entity, boneName)
+            if boneIndex ~= -1 then
+                local boneCoords = GetWorldPositionOfEntityBone(item.entity, boneIndex)
+                worldPos = utils:getRelativeOffsetFromCoordsInWorldCoords(boneCoords, GetEntityRotation(item.entity, 2), offset)
+            end
         end
 
-        return GetOffsetFromEntityInWorldCoords(item.entity, offset.x, offset.y, offset.z)
+        return worldPos
     end
 
     if item.bone then

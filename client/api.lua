@@ -89,27 +89,44 @@ local function addOptions(target, options, resource, bonesTarget, offsetsTarget)
             end
         end
 
-        if option.offset or option.offsetAbsolute then
-            local offsetKey = option.offset and 'offset' or 'offsetAbsolute'
-            local offset = option[offsetKey]
-            local offsetType = type(offset)
+        if offsetsTarget and (option.offset or option.offsetAbsolute or option.offsetBones) then
+            if option.offset or option.offsetAbsolute then
+                local offsetKey = option.offset and 'offset' or 'offsetAbsolute'
+                local offset = option[offsetKey]
+                local offsetType = type(offset)
 
-            if offsetType == 'table' and offset.x and offset.y and offset.z then
-                offset = vec3(offset.x, offset.y, offset.z)
-            end
-
-            if offsetType ~= 'table' and offsetType ~= 'vector3' then
-                typeError('offset', 'vector3', offsetType)
-            end
-
-            local offsetStr = utils.makeOffsetIdFromCoords(offset, offsetKey)
-
-            if offsetsTarget and offsetStr then
-                offsetsTarget[offsetStr] = offsetsTarget[offsetStr] or {}
-                if option.name then
-                    removeOptions(offsetsTarget[offsetStr], { option.name }, resource)
+                if offsetType == 'table' and offset.x and offset.y and offset.z then
+                    offset = vec3(offset.x, offset.y, offset.z)
                 end
-                table.insert(offsetsTarget[offsetStr], table.remove(options, i))
+
+                if offsetType ~= 'table' and offsetType ~= 'vector3' then
+                    typeError('offset', 'vector3', offsetType)
+                end
+
+                local offsetStr = utils.makeOffsetIdFromCoords(offset, offsetKey)
+
+                if offsetStr then
+                    offsetsTarget[offsetStr] = offsetsTarget[offsetStr] or {}
+                    if option.name then
+                        removeOptions(offsetsTarget[offsetStr], { option.name }, resource)
+                    end
+                    table.insert(offsetsTarget[offsetStr], table.remove(options, i))
+                end
+
+            else
+                local boneOptions = table.remove(options, i)
+
+                for boneName, offset in pairs(option.offsetBones) do
+                    local offsetStr = utils.makeOffsetIdFromCoords(offset, ('offsetBones_%s'):format(boneName))
+
+                    if offsetStr then
+                        offsetsTarget[offsetStr] = offsetsTarget[offsetStr] or {}
+                        if option.name then
+                            removeOptions(offsetsTarget[offsetStr], { option.name }, resource)
+                        end
+                        table.insert(offsetsTarget[offsetStr], boneOptions)
+                    end
+                end
             end
         elseif option.bones and bonesTarget then
             if type(option.bones) ~= "table" then
@@ -282,7 +299,7 @@ end
 ---@param remove? string | string[] A single option name or array of names to remove, or nil to remove all for the resource.
 function interact.removeGlobalVehicle(remove)
     if not remove then return end
-    
+
     removeTarget(store.vehicles, remove, GetInvokingResource(), store.bones.vehicles, store.offsets.vehicles)
 
     if store.bones.vehicles then

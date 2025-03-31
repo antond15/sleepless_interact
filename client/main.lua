@@ -326,15 +326,24 @@ local function checkNearbyEntities(coords)
 
             if offsetOptions then
                 for offsetStr, _options in pairs(offsetOptions) do
-                    local x, y, z, offsetType = utils.getCoordsAndTypeFromOffsetId(offsetStr)
+                    local x, y, z, offsetType, boneName = utils.getCoordsAndTypeFromOffsetId(offsetStr)
                     if x and y and z and offsetType then
-                        local offset = vec3(tonumber(x), tonumber(y), tonumber(z))
+                        local offset = vec3(tonumber(x), tonumber(y), tonumber(z)) ---@diagnostic disable-line: param-type-mismatch
                         local worldPos
-                        if offsetType == "offset" then
+
+                        if offsetType == 'offset' then
                             local min, max = GetModelDimensions(model)
                             offset = (max - min) * offset + min
+                            worldPos = GetOffsetFromEntityInWorldCoords(entity, offset.x, offset.y, offset.z)
+
+                        elseif boneName and offsetType == 'offsetBones' then
+                            local boneIndex = GetEntityBoneIndexByName(entity, boneName)
+                            if boneIndex ~= -1 then
+                                local boneCoords = GetWorldPositionOfEntityBone(entity, boneIndex)
+                                worldPos = exports.utils:getRelativeOffsetFromCoordsInWorldCoords(boneCoords, GetEntityRotation(entity, 2), offset)
+                            end
                         end
-                        worldPos = GetOffsetFromEntityInWorldCoords(entity, offset.x, offset.y, offset.z)
+
                         num = num + 1
                         valid[num] = {
                             entity = entity,
