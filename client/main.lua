@@ -331,28 +331,31 @@ local function checkNearbyEntities(coords)
                         local offset = vec3(tonumber(x), tonumber(y), tonumber(z)) ---@diagnostic disable-line: param-type-mismatch
                         local worldPos
 
-                        if offsetType == 'offset' then
-                            local min, max = GetModelDimensions(model)
-                            offset = (max - min) * offset + min
-                            worldPos = GetOffsetFromEntityInWorldCoords(entity, offset.x, offset.y, offset.z)
-
-                        elseif boneName and offsetType == 'offsetBones' then
+                        if boneName and offsetType == 'offsetBones' then
                             local boneIndex = GetEntityBoneIndexByName(entity, boneName)
                             if boneIndex ~= -1 then
                                 local boneCoords = GetWorldPositionOfEntityBone(entity, boneIndex)
-                                worldPos = exports.utils:getRelativeOffsetFromCoordsInWorldCoords(boneCoords, GetEntityRotation(entity, 2), offset)
+                                worldPos = utils.getRelativeOffsetFromCoordsInWorldCoords(boneCoords, GetEntityRotation(entity, 2), offset)
                             end
+                        else
+                            if offsetType == 'offset' then
+                                local min, max = GetModelDimensions(model)
+                                offset = (max - min) * offset + min
+                            end
+                            worldPos = GetOffsetFromEntityInWorldCoords(entity, offset.x, offset.y, offset.z)
                         end
 
-                        num = num + 1
-                        valid[num] = {
-                            entity = entity,
-                            offset = offsetStr,
-                            coords = worldPos,
-                            currentDistance = #(coords - worldPos),
-                            currentScreenDistance = utils.getScreenDistanceSquared(worldPos),
-                            options = _options
-                        }
+                        if worldPos then
+                            num = num + 1
+                            valid[num] = {
+                                entity = entity,
+                                offset = offsetStr,
+                                coords = worldPos,
+                                currentDistance = #(coords - worldPos),
+                                currentScreenDistance = utils.getScreenDistanceSquared(worldPos),
+                                options = _options
+                            }
+                        end
                     end
                 end
             end

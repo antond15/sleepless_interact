@@ -144,17 +144,18 @@ function utils.getDrawCoordsForInteract(item)
         local offset = vec3(tonumber(x), tonumber(y), tonumber(z))
         local worldPos
 
-        if offsetType == 'offset' then
-            local min, max = GetModelDimensions(entityModel)
-            offset = (max - min) * offset + min
-            worldPos = GetOffsetFromEntityInWorldCoords(item.entity, offset.x, offset.y, offset.z)
-
-        elseif boneName and offsetType == 'offsetBones' then
+        if boneName and offsetType == 'offsetBones' then
             local boneIndex = GetEntityBoneIndexByName(item.entity, boneName)
             if boneIndex ~= -1 then
                 local boneCoords = GetWorldPositionOfEntityBone(item.entity, boneIndex)
-                worldPos = utils:getRelativeOffsetFromCoordsInWorldCoords(boneCoords, GetEntityRotation(item.entity, 2), offset)
+                worldPos = utils.getRelativeOffsetFromCoordsInWorldCoords(boneCoords, GetEntityRotation(item.entity, 2), offset)
             end
+        else
+            if offsetType == 'offset' then
+                local min, max = GetModelDimensions(entityModel)
+                offset = (max - min) * offset + min
+            end
+            worldPos = GetOffsetFromEntityInWorldCoords(item.entity, offset.x, offset.y, offset.z)
         end
 
         return worldPos
